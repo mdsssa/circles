@@ -93,7 +93,8 @@ public:
         if (!flag) return;
         sf::CircleShape shape(R);
         shape.setFillColor(color);
-        shape.setPosition({x - R, y - R});
+        shape.setOrigin({R, R});
+        shape.setPosition({x, y});
         window.draw(shape);
     }
 };
@@ -203,16 +204,16 @@ int main()
             }
         }
 
-        // Движение шаров + очень лёгкое притяжение
+
         for (int i = 0; i < COUNT; i++)
         {
             if (pt[i].isTraveling) continue;
 
-            // Обычное движение
+  
             pt[i].x += pt[i].xSpeed * speedK;
             pt[i].y += pt[i].ySpeed * speedK;
 
-            // === ОЧЕНЬ СЛАБОЕ ПРИТЯЖЕНИЕ К ВОРОНКЕ ===
+
             if (pt[i].vessel == 1)
             {
                 float targetX = vessel2.x - vessel2.baseR + 28;
@@ -220,13 +221,11 @@ int main()
                 
                 float dx = targetX - pt[i].x;
                 float dy = targetY - pt[i].y;
-                
-                // Очень слабое притяжение
+
                 pt[i].x += dx * 0.0022f;
                 pt[i].y += dy * 0.0022f;
             }
 
-            // Коллизия со стенками
             if (pt[i].vessel == 0)
             {
                 float dx = pt[i].x - vessel1.x;
@@ -255,12 +254,11 @@ int main()
                     float angle = atan2f(dy, dx);
                     pt[i].x = vessel2.x + cosf(angle) * maxDist;
                     pt[i].y = vessel2.y + sinf(angle) * maxDist;
-                    pt[i].xSpeed = -pt[i].xSpeed * 0.82f;
-                    pt[i].ySpeed = -pt[i].ySpeed * 0.82f;
+                    pt[i].xSpeed = -pt[i].xSpeed * 0.30f;
+                    pt[i].ySpeed = -pt[i].ySpeed * 0.30f;
                 }
             }
 
-            // Не даём шарам полностью останавливаться
             float speed = sqrtf(pt[i].xSpeed*pt[i].xSpeed + pt[i].ySpeed*pt[i].ySpeed);
             if (speed < 0.25f && speed > 0.001f)
             {
@@ -273,54 +271,67 @@ int main()
                 if (!pt[i].isTraveling && !pt[j].isTraveling)
                     handleCollision(pt[i], pt[j]);
 
-        // Засасывание + анимация
-        transferTimer += 0.22f;
-        if (transferTimer > 0.22f && travelingBallIndex == -1)
+        if (travelingBallIndex == -1)
         {
-            transferTimer = 0.0f;
             
+            int bestIndex = -1;
+            float bestDist = 1e9f;
+
             for (int i = 0; i < COUNT; i++)
             {
                 if (pt[i].vessel != 1 || pt[i].isTraveling) continue;
 
-                float dx = pt[i].x - vessel2.x;
-                float dy = pt[i].y - vessel2.y;
+                float tubeX = vessel2.x - vessel2.baseR;
+                float tubeY = vessel2.y;
 
-                if (dx < -32 && std::abs(dy) < 13)
+                float dx = pt[i].x - tubeX;
+                float dy = pt[i].y - tubeY;
+                float dist = sqrtf(dx*dx + dy*dy);
+
+                if (dist < bestDist)
                 {
-                    travelingBallIndex = i;
-                    pt[i].isTraveling = true;
-                    pt[i].travelProgress = 0.0f;
-                    suctionProgress = 0.0f;
-                    pt[i].vessel = -1;
-                    break;
+                    bestDist = dist;
+                    bestIndex = i;
                 }
+            }
+
+            if (bestIndex != -1)
+            {
+                travelingBallIndex = bestIndex;
+                pt[bestIndex].isTraveling = true;
+                pt[bestIndex].travelProgress = 0.0f;
+                suctionProgress = 0.0f;
+                pt[bestIndex].vessel = -1;
             }
         }
 
         if (travelingBallIndex != -1)
         {
             int i = travelingBallIndex;
-            
+
             if (suctionProgress < 1.0f)
             {
-                suctionProgress += 0.3f;
+                suctionProgress += 0.055f;
+                float t = suctionProgress;
+
                 float targetX = vessel2.x - vessel2.baseR + 22;
                 float targetY = vessel2.y;
-                
-                pt[i].x += (targetX - pt[i].x) * 0.45f;
-                pt[i].y += (targetY - pt[i].y) * 0.45f;
+
+                pt[i].x += (targetX - pt[i].x) * 0.3f;
+                pt[i].y += (targetY - pt[i].y) * 0.3f;
             }
             else
             {
                 pt[i].travelProgress += 0.035f;
+                float t = pt[i].travelProgress;
 
                 float startX = vessel2.x - vessel2.baseR + 28;
                 float endX   = vessel1.x + vessel1.baseR - 20;
                 float tubeY  = vessel1.y;
 
-                pt[i].x = startX + (endX - startX) * pt[i].travelProgress;
+                pt[i].x = startX + (endX - startX) * t;
                 pt[i].y = tubeY;
+
 
                 if (pt[i].travelProgress >= 1.0f)
                 {
@@ -329,10 +340,12 @@ int main()
                     pt[i].travelProgress = 0.0f;
                     travelingBallIndex = -1;
                     suctionProgress = 0.0f;
+                    pt[i].xSpeed = -generateSpeed() * 1.8f;
+                    pt[i].ySpeed =  generateSpeed() * 1.8f;
                 }
             }
         }
-
+        
         vessel1.ballCount = 0;
         vessel2.ballCount = 0;
         for (int i = 0; i < COUNT; i++) {
@@ -347,7 +360,7 @@ int main()
 
         sf::RectangleShape tube(sf::Vector2f(vessel2.x - vessel1.x - 238, 14));
         tube.setPosition({vessel1.x + vessel1.baseR, vessel1.y - 7});
-        tube.setFillColor(sf::Color(133 , 133 , 255));
+        tube.setFillColor(sf::Color( 0, 0, 102));
         window.draw(tube);
 
         sf::CircleShape v1(vessel1.baseR);
